@@ -1,0 +1,37 @@
+# Fill in your name, student ID, and email address in this file.
+# If you are working in a team, fill out the information for both team 
+# members.
+
+# SUBMIT THE LAB ONLY ONCE (from only one partner). This file will be
+# automatically parsed in order to give both team members credit for the
+# lab.
+
+# If you did one or more extra credit problems, indicate which one in the
+# appropriate section below (remove the # sign first). If you have any other
+# information you'd like us to know, please add it at the end of the file.
+
+# Partner 1
+Name: Chunnan Yao
+Student ID: 204568002
+Email: yaochunnan@ucla.edu
+
+# Partner 2 (if you're working in a team)
+Name: 
+Student ID: 
+Email: 
+
+# Extra credit problems
+#Extra credit problem: none
+
+# Add any other information you'd like us to know below this line.
+In this implementation, I programmed free_block defensively to make it more robust. I didn’t use indir2_index API, instead I wrote the procedure inline. In add_block and remove_block, I illustrate 6 cases to cover indirect, indirect2 creation. I also implemented conditional symbolic link. But even Linux itself can’t pass the test case. So I just leave it there. 
+
+This lab is laborious and takes me some time to debug. Here are some of my bugs for record:
+1. typos (user fill_dir instead of filldir)
+2. didn’t modify code systematically (in readdir, f_pos should be file quantity rather than byte number. While extracting data I used OSPFS_DIRENTRY_SIZE to multiply it, I used f_pos += OSPFS_DIRENTRY_SIZE to update f_pos, which is not unified with my assumption)
+3. understanding to some function is not accurate. (unlink, symlink..)
+4. in else if(n > OSPFS_NDIRECT && n < OSPFS_NDIRECT + OSPFS_NINDIRECT) of add_block, mistakenly used indirect_ptr = ospfs_block(indir_index(n));
+5. In ospfs_write, misunderstood O_APPEND
+
+Luckily I solved all these bugs and get it work! XDDD
+

@@ -1,0 +1,15 @@
+Author: Chunnan Yao
+UCLA id: 204568002
+email: yaochunnan@ucla.edu
+
+Author: Jiaqi Huo
+UCLA id: 704589101
+email: huojiaqi931019@gmail.com
+-----------------------------
+report_graph.pdf: My explanations on results and graphs required.
+timg_result.xml: My timing data used for drawing graphs.
+code/: source code and make file of addtest and sltest
+
+All the codes compile with no errors and warnings on SEASNET servers. 
+
+March 8th, 2016

@@ -1,0 +1,295 @@
+Name: Chunnan Yao
+UCLA ID: 204568002
+
+
+-------------------------------------------------------------------------------
+
+Response to Exercise 1:
+Yes, sys_getpid() call will return correct value because sys_getpid() only puts current process A's pid into %eax. schedule() function is used to change the current process from process A to another process B that the kernel will be handling right after. As defined in mpos-kern.h, processes have their own registers and so the value of A's %eax and B's %eax will not interfere with each other. 
+
+Response to Excercise 2:
+
+static pid_t
+do_fork(process_t *parent)
+{
+        int i;
+        //step1: scan every entry(except for 0) of proc_array to find a process slot that is available (P_EMPTY)
+        for(i=1; i<NPROCS; i++) {
+                if(proc_array[i].p_state == P_EMPTY) break;
+        }
+        //if we can't find an available process slot, returning -1, which tells the user fork has failed.
+        if(i==NPROCS) return -1;
+        //step2: copy the currnet process's register content to its child
+        proc_array[i].p_registers = parent->p_registers;
+        //step3: copy stack content
+        copy_stack(&proc_array[i], parent);
+        //step4: change the child's process state to "runnable" so that child process will run
+        proc_array[i].p_state = P_RUNNABLE;
+        //step5: For child process, fork just returns 0
+        proc_array[i].p_registers.reg_eax = 0;
+        //step6: For current process, fork returns child's pid.
+        return proc_array[i].p_pid;
+}
+
+static void
+copy_stack(process_t *dest, process_t *src)
+{
+		//As described in the memory map, the key to implement copy_stack is to calculate 
+		//both dest process and src process's stack top & bottom, and use memcpy to make a 
+		//copy of src to dest. Moreover, dest process's %esp register should be set to the 
+		//bottom of its stack in order to make it confront to OS desgin principle.
+
+        uint32_t src_stack_bottom, src_stack_top;
+        uint32_t dest_stack_bottom, dest_stack_top;
+
+		src_stack_top = src->p_pid * PROC_STACK_SIZE + PROC1_STACK_ADDR; /* YOUR CODE HERE */;
+        src_stack_bottom = src->p_registers.reg_esp;
+        uint32_t  stack_size = src_stack_top - src_stack_bottom;
+        dest_stack_top = dest->p_pid * PROC_STACK_SIZE + PROC1_STACK_ADDR; /* YOUR CODE HERE: calculate based on the
+                         other variables */
+        dest_stack_bottom = dest_stack_top - stack_size;
+        memcpy((void *)dest_stack_bottom, (void *)src_stack_bottom, (size_t)stack_size + 1);
+        dest->p_registers.reg_esp = dest_stack_bottom;
+        // YOUR CODE HERE: memcpy the stack and set dest->p_registers.reg_esp               
+
+
+Response to Excercise 3/4:
+in file mpos-kern.h:
+
+//Add filed "waiting_pid" to struct "process" so that every process knows if it is waiting for some other process
+//And the pid of that process
+typedef struct process {
+        pid_t p_pid;                    // Process ID
+
+        registers_t p_registers;        // Current process state: registers,
+                                        // stack location, EIP, etc.
+                                        // 'registers_t' defined in x86.h
+        procstate_t p_state;            // Process state; see above
+        int p_exit_status;              // Process's exit status (if it has
+                                        // exited and p_state == P_ZOMBIE)
+        pid_t waiting_pid;              // the pid that the current process is waiting for
+} process_t;
+
+in file mpos-kern.c:
+
+ case INT_SYS_EXIT:
+ 		//change curren process's status to zombie, indicating that it has exited
+        current->p_state = P_ZOMBIE;
+        int i;
+        //scan all processes to find the processes that are waiting for current process
+        //Once found, unblock them, recycle current process for future use, update current process's exit status
+        //Also send its exit status to those waiting for current process as their return value of sys_wait()
+        //function. Finally, set waiting processes' waiting_pid filed to default(0), because they no longer wait 
+        //for current process.
+        for(i=1; i<NPROCS; i++) {
+                if(proc_array[i].waiting_pid == current->p_pid) {
+                        proc_array[i].p_state = P_RUNNABLE;
+                        current->p_state = P_EMPTY;
+                        current->p_exit_status = current->p_registers.reg_eax;
+                        proc_array[i].p_registers.reg_eax = current->p_exit_status;
+                        proc_array[i].waiting_pid = 0;
+                }
+
+        }
+        schedule();
+ case INT_SYS_WAIT: {
+		//get input---- id of the process that the current process wants to wait for
+        pid_t p = current->p_registers.reg_eax;
+        // If pid is invalid or the aimed process is empty, there is no need to wait for them. sys_wait() directly returns -1, reporting that wait operation fails.
+        if(p <= 0 || p >= NPROCS || p == current->p_pid || proc_array[p].p_state == P_EMPTY) current->p_registers.reg_eax = -1;
+        //If the aimed process has exited and is zombie, recycle it for later reuse
+        else if (proc_array[p].p_state == P_ZOMBIE) {
+        	current->p_registers.reg_eax = proc_array[p].p_exit_status;
+        	proc_array[p].p_state = P_EMPTY;
+       	} else {
+       		//If the process is running, set its waiting pid to aimed pid and block the process as required.
+                current->waiting_pid = p;
+                current->p_state = P_BLOCKED;
+        }
+        schedule();
+
+
+
+Extra credit exercises:
+
+**************
+For extra-credit exercise 5, 6, 7, I created test codes named mpos-app-extra5.c, mpos-app-extra6.c, mpos-app2-extra7.c. Please replace corresponding mpos-app.c or mpos-app2.c with them and run bochs to see behaviors. 
+**************
+Response for Extra-Credit Exercise 5:
+	
+	void start(void) {
+	    int x = 10;  /* note that local variable x lives on the stack */
+
+	    //get the address of x in parent process's stack, using volatile pointer
+	    //because the pointer will be used by other process
+	    int * volatile ptrx = &x;
+	    pid_t p = sys_fork();
+
+	    if (p == 0) {
+	    	//Inside child process, get the address of parent's x and change x's value
+            *ptrx = 11;
+            sys_exit(-1);
+	    } else if (p > 0)
+	        sys_wait(p); // assume blocking implementation
+	    //right parent process has been influenced by child process. value of x is set by child process, 
+	    //which indicates that MiniOS is not robust in its multiprocess design.
+	    app_printf("%d", x);
+	    sys_exit(0);
+	}
+
+Response for Extra-Credit Exercise 6:
+	
+    In mpos.h:
+    #define INT_SYS_NEWTHREAD   53
+
+    In mpos-app.h:
+    //define system call
+    static inline pid_t
+    sys_newthread(void (*start_function)(void)) 
+    {
+        pid_t pid;  
+        asm volatile("int %1\n"
+                 : "=a" (pid)
+                 : "i" (INT_SYS_NEWTHREAD),
+                   "a" (start_function)
+                 : "cc", "memory");
+        return pid;
+
+    }
+
+    In mpos-kern.c:
+    //implement system call
+    case INT_SYS_NEWTHREAD:
+    current->p_registers.reg_eax = new_thread();
+    run(current);
+....
+    
+    static pid_t
+    new_thread() 
+    {
+        int i;
+        //looking for available process slot
+        for(i=1; i<NPROCS; i++) {
+            if(proc_array[i].p_state == P_EMPTY) break;     
+        }
+        if(i==NPROCS) return -1;
+        uint32_t aim_stk_top;
+        aim_stk_top = PROC1_STACK_ADDR + PROC_STACK_SIZE * i;
+        //set child process as runnable
+        proc_array[i].p_state = P_RUNNABLE;
+        proc_array[i].p_registers = current->p_registers;
+        //set instruction pointer to the aimed functions entry address
+        proc_array[i].p_registers.reg_eip = current->p_registers.reg_eax;
+        //move stack pointer to the top so that we can regard stack as cleaned.
+        proc_array[i].p_registers.reg_esp = aim_stk_top;
+        return proc_array[i].p_pid;
+    }
+
+    Test code, replace mpos-app.c:
+
+    //As expected, new process will jump into this function and print "HOHOHOHOHOHOHOHO..."
+    void start_test(void) {    
+    app_printf("About to start a new thread...\n");
+    app_printf("HOHOHOHOHOHOHHOHO...\n");
+    sys_exit(0);
+
+    }
+
+    void run_child(void);
+
+    void
+    start(void)
+    {
+        pid_t p;
+        int status;
+        app_printf("Main process %d!\n", sys_getpid());
+        p = sys_newthread(&start_test);
+        status = sys_wait(p);
+        app_printf("Child thread %d exited with status %d!\n", p, status);
+        sys_exit(0);
+    }
+
+Response for Extra-Credit Exercise 7:
+    In mpos.h:
+    #define INT_SYS_KILL        54
+
+    In mpos-app.h:
+    //define system call
+    static inline int
+    sys_kill(pid_t pid)  
+    {
+        int retval;
+        asm volatile("int %1\n"
+                 : "=a" (retval)
+                 : "i" (INT_SYS_KILL),
+                   "a" (pid)
+                 : "cc", "memory");
+        return retval;
+    }
+
+    In mpos-kern.c:
+    //Implement system call
+        case INT_SYS_KILL:{
+        pid_t aim = current->p_registers.reg_eax;
+        //If the aimed process is out of scope or no need to kill (empty or zombie), sys_kill() returns -1 indicating operation fails
+        if(aim < 1 || aim >= NPROCS || proc_array[aim].p_state == P_EMPTY || proc_array[aim].p_state == P_ZOMBIE) {
+            current->p_registers.reg_eax = -1;
+        } else {
+        //Begin killing. Looking for the processes that are waiting for aimed process and unblock them similar to SYS_EXIT
+            int i;
+            for(i=1; i<NPROCS; i++) {
+                if(proc_array[i].waiting_pid == proc_array[aim].p_pid) {
+                    proc_array[i].p_state = P_RUNNABLE;
+                    proc_array[i].p_registers.reg_eax = -1;
+                    proc_array[i].waiting_pid =0;
+                }
+            }
+        //assume processes killed have exit status -1
+            proc_array[aim].p_exit_status = -1;
+            proc_array[aim].p_state = P_ZOMBIE;  
+        //ZOMBIE should not wait for any other process
+            proc_array[aim].waiting_pid = 0;
+        //sys_kill successfully executed so return 0
+            current->p_registers.reg_eax = 0;
+        }
+        run(current);   
+    }
+
+    Test code, replace mpos-app2.c:
+    void
+    run_child(void)
+    {
+        ....
+        pid_t curpid = sys_getpid();
+        
+        //if current pid is even, then kill all other processes with odd pid
+        if(curpid % 2==0) {
+            int i=3;
+            for(;i<NPROCS; i += 2) sys_kill(i);
+        }
+        app_printf("Process %d lives, counter %d!\n",
+               sys_getpid(), input_counter);
+        sys_exit(input_counter);
+    }
+
+Anything else you'd like us to know:
+
+**************
+For extra-credit exercise 5, 6, 7, I created test codes named mpos-app-extra5.c, mpos-app-extra6.c, mpos-app2-extra7.c. Please replace corresponding mpos-app.c or mpos-app2.c with them and run bochs to see behaviors. 
+**************
+
+    In implementing exercise 2, I once forgot to set %esp of the child process, which caused some confusion. 
+
+    In implementing exercise 3, I have to scan all processes to find the ones that are waiting for current process. This might be a preformance issue when number of processes becomes enormous. 
+
+    In implementing exercise 4, I recycle zombie process both in SYS_EXIT and SYS_WAIT. SYS_EXIT recycles waiting processes, SYS_WAIT recycles the process that has been zombie when sys_wait() is called.
+
+    For exercise 5, just be care of usage of “volatile”, then this problem is trivial.
+
+    In implementing exercise 6, I once reseted all registers of child process, which causes shutdown of bochs. From the usage of segments_init() and special_registers_init(current) in mpos-kern.c I learned, there are certain system reserved registers that we should maintain all the time.
+
+    In implementing exercise 7, the behavior of mpos-app2.c caused some confusion to us. It seems program will try to fork in a greedy way, filling all process slots, and then it will try to run from its first child. Later we understood that it's because WeensyOS uses cooperative multitasking. In the while loop containing fork, there are no system calls. So the scheduling function will not be triggered and current process maintains the same until all the process slots are filled up and we jumped out of while loop and hit sys_wait. 
+
+
+
+

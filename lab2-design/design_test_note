@@ -1,0 +1,7 @@
+./osprdaccess -s 17 (all responds)
+
+./osprdaccess -S 10 23 (all responds)
+
+./osprdaccess -b 9001 (all responds)
+
+./osprdaccess -a

@@ -1,0 +1,64 @@
+Name:Chunnan Yao
+UCLA ID:204568002
+
+Collaborators:
+
+-------------------------------------------------------------------------------
+
+Response to Exercise 1:
+
+The name of the scheduling algorithm is:
+Round Robin(Not exactly.Because in our user app, they cooperatively call sys_yield, so it’s like a cooperative scheduling algorithm which mimics Round Robin.
+
+(Exercise 2 is a coding exercise)
+
+
+Response to Exercise 3:
+
+Average turnaround time for scheduling_algorithm 0:
+(1277+1278+1279+1280)/4 = 1278.5ms
+Average turnaround time for scheduling_algorithm 1:
+(320+640+960+1280)/4=800ms
+
+Average wait time for scheduling_algorithm 0:
+(0+1+2+3)/4=1.5ms
+Average wait time for scheduling_algorithm 1:
+(0+320+640+960)/4=480ms
+
+
+Exercise 4:
+
+Did you complete Exercise 4A, Exercise 4B, or both for extra credit?
+I completed Exercise 4A. To see the result, you should:
+1. change the value of PRIO of each user app 
+2. set scheduling_algorithm variable in schedos-kern.c to 2
+3. make sure interrupt_controller_init is turned off.
+4. compile with “#define __EXERCISE_8__” commented. 
+
+Note that initially, priorities of process 1-4 are the same. So at the beginning, it will print 1234 to the screen. 
+
+Exercise 5:
+Process 4 is interrupted. From the screenshot, we can see the round robin does normally and print 1234 for 4 rounds. However, at the fifth round, “4” is overwritten by “1” of next round of printing. That’s because after executing “*cursorpos = PRINTCHAR;” and before “cursorpos++”, in process 4, clock interrupt happened. Process 1 overwrited the “4” printed by process 4.
+
+(Exercise 6 is a coding exercise)
+I implemented a new system call that atomically print to the console. 
+
+Anything else you'd like us to know:
+I finished both extra-credit exercise 7 and 8. 
+
+Extra credit exercises:
+
+Extra-Credit Exercise 7:
+Implemented lottery scheduling. To see the effect, you should:
+1. Use system call sys_set_nlottery(LOTTERY) to set the number of tickets each process holds. 
+2. set scheduling_algorithm variable in schedos-kern.c to 3
+3. make sure interrupt_controller_init is turned on.
+4. compile with “#define __EXERCISE_8__” commented. 
+By default, I set process1:10, process2:2, process3:3, process4:4. So you will see at the beginning, lots of 1 are printed, and then 4 and 3 interleaving with each other(4 is a little more). Finally lots of 2s end the printing. 
+
+I ensure the randomness by exploiting read_cycle_counter() in x86.h. I generate my random number by calling r = ((r * 7621) + 1) % 32768.
+
+Extra-Credit Exercise 8:
+I implemented a spin lock for all 4 processes. The lock shared memory is beginning at 0x198004. I used atomic_swap() in x86sync.h to ensure atomicy. 
+
+

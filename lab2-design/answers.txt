@@ -1,0 +1,81 @@
+# Fill in your name, student ID, and email address in this file.
+
+# If you are working in a team, remove the # signs from the three lines for
+# partner 2 below and fill them in as well. Please submit the lab to CourseWeb
+# only once (from only one partner). This file will be automatically parsed in
+# order to give both team members credit for the lab.
+
+# If you have any other information you'd like us to know, please add it at
+# the end of the file.
+
+# Partner 1
+Name: Chunnan Yao
+Student ID: 204568002
+Email: yaochunnan@ucla.edu
+
+# Partner 2
+Name: Zhouyihai Ding
+Student ID: 604588140
+Email: dzyh1118@g.ucla.edu
+
+
+# Add any other information you'd like us to have below this line.
+
+This design implements the "change notification" functionality. It supports continuous checking on block range, single block, any byte, and all the way down to single byte.
+
+The API usage is as follows. 
+./osprdaccess.c -s [BLOCK NUMBER] //monitor a single block
+./osprdaccess.c -S [BLOCK RANGE]  //monitor a block range
+./osprdaccess.c -b [BYTE NUMBER]  //monitor a single byte
+./osprdaccess.c -a                //monitor all bytes
+
+We use "data12", "delayed_operations.sh", "design_test_note" to conduct test. "data12" is a 12-block data used to write during testing. "delayed_operations.sh" conducts different read/write operations after 10 seconds of running. This is to give tester enough time to input commands in "design_test_note" file. 
+
+<---------------TEST------------------>
+
+Test result is as follows:
+for ./osprdaccess -s 17:
+RAMDISK MESSAGE: writting on sector 17
+RAMDISK MESSAGE: writting on sector 17
+RAMDISK MESSAGE: writting on sector 17
+
+for ./osprdaccess -S 10 23:
+RAMDISK MESSAGE: writting on sector 17 to sector 17
+RAMDISK MESSAGE: writting on sector 10 to sector 17
+RAMDISK MESSAGE: writting on sector 10 to sector 16
+RAMDISK MESSAGE: writting on sector 16 to sector 17
+
+for ./osprdaccess -b 9001:
+RAMDISK MESSAGE: writting on byte 9001
+RAMDISK MESSAGE: writting on byte 9001
+RAMDISK MESSAGE: writting on byte 9001
+
+for ./osprdaccess -a:
+RAMDISK MESSAGE: writting on byte 9000 to byte 9005.
+RAMDISK MESSAGE: writting on byte 3100 to byte 9100.
+RAMDISK MESSAGE: writting on byte 3100 to byte 8192.
+RAMDISK MESSAGE: writting on byte 8192 to byte 9100.
+
+
+As will shown in test, our design perfectly monitors changes in RAMDISK. 
+
+
+<---------------IMPLEMENTATION---------------->
+First write a struct msg_t in osprd.h to transfer user info into kernel.
+
+typedef struct msg {
+	char w_type;
+	char *u_offset;
+	char *u_end;
+} msg_t;
+
+In kernel code osprd.c, add following fields to osprd_info_t:
+
+int info_flag; //0: no info 1:write 2:read
+int info_byte_offset;
+int info_byte_size;
+int s_change; //denote wether there are changes 
+
+Monitor ramdisk status in osprd_process_request(). send a wake up signal to monitoring process.
+
+In monitoring process, initially it is blocked by wait_event_interruptible(), every time a wake up signal comes, it runs codes to display "RAMDISK MESSAGE:..."， then resume blocking status. 

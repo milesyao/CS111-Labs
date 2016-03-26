@@ -1,0 +1,13 @@
+204568002 Chunnan Yao
+
+Project 1a
+
+This implementation opens file, runs command in parallel, and can verbose options as required.  
+
+Besides, user input is strictly check before utilization. For example, 
+1. If parameters of an option is too many or too few, warning/error will be printed to screen. 
+2. If a file fails to open, an error will be printed to screen. 
+3. If an parameters of an option is invalid, say, exceeded file descriptor or non-number string as file descriptor, error message will be printed to screen. 
+4. If the executable fails to execute, error will be printed to screen. 
+
+I used malloc/realloc to dynamically assign space in the program. 
